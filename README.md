@@ -1,6 +1,6 @@
 # Invoice RPA Manager (V 1.0)
 
-Aplicación full-stack para la carga, previsualización y monitoreo de facturas PDF. Al subir un comprobante, el sistema registra la factura en base de datos con estado **PENDIENTE** y expone una API para que un bot de **Automation Anywhere** consulte el archivo, lo procese y actualice el estado final (`PROCESADO`, `PROCESANDO`, `ERROR`, etc.).
+Aplicación para la carga, previsualización y monitoreo de facturas PDF. Al subir un comprobante, el sistema registra la factura en base de datos con estado **PENDIENTE** y expone una API para que un bot de **Automation Anywhere** consulte el archivo, lo procese y actualice el estado final (`PROCESADO`, `PROCESANDO`, `ERROR`, etc.).
 
 ---
 
