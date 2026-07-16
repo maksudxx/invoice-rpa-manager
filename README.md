@@ -200,6 +200,14 @@ node src/scripts/bot-simulator.js
 
 ## 8. Integración con Automation Anywhere
 
+Este proyecto es el punto de control de una automatización documental integral. La solución incluye:
+
+- Entrenamiento de modelos: Configuración de instancias de aprendizaje en Automation Anywhere para el reconocimiento de facturas.
+
+- Bot Orquestador: Desarrollo de un bot especializado que procesa los archivos, ejecuta la extracción de datos y realiza el callback a la API para la actualización de estados.
+
+- Monitoreo: Interfaz diseñada para visualizar el resultado del procesamiento y gestionar errores de forma centralizada."
+
 El procesamiento documental es ejecutado por un **bot de Automation Anywhere** desplegado en un entorno control room. A continuación se describe el ciclo de vida técnico completo.
 
 ### 8.1. Disparador del proceso
