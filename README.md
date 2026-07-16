@@ -1,4 +1,4 @@
-# Invoice RPA Manager
+# Invoice RPA Manager (V 1.0)
 
 Aplicación full-stack para la carga, previsualización y monitoreo de facturas PDF. Al subir un comprobante, el sistema registra la factura en base de datos con estado **PENDIENTE** y expone una API para que un bot de **Automation Anywhere** consulte el archivo, lo procese y actualice el estado final (`PROCESADO`, `PROCESANDO`, `ERROR`, etc.).
 
@@ -19,6 +19,8 @@ invoice-rpa-manager/
 │       │   └── multer.js         # Configuración de carga de archivos
 │       ├── controllers/
 │       │   └── invoiceController.js
+|       ├── scripts/
+│       │   └── bot-simulator.js  ## Simulador para pruebas sin tener que implementar Automation anywhere
 │       ├── models/
 │       │   └── Invoice.js
 │       └── routes/
@@ -41,18 +43,6 @@ invoice-rpa-manager/
             └── DashboardInvoices/
 ```
 
-## Diagrama de arquitectura
-
-
-```text
-[Frontend] --> [API Node.js] --> [PostgreSQL]
-                  ↑  |
-        (Resp AA) |  |(Files)
-                  |  v
-             [Automation Anywhere]
-```
----
-
 ## 2. Tecnologías
 
 ### Backend
@@ -70,6 +60,14 @@ invoice-rpa-manager/
 - Vite 8
 - Tailwind CSS 4
 - Lucide React (iconografía)
+
+```text
+[Frontend] --> [API Node.js] --> [PostgreSQL]
+                  ↑  |
+        (Resp AA) |  |(Files)
+                  |  v
+             [Automation Anywhere]
+```
 
 ---
 
@@ -181,11 +179,30 @@ const API_URL = "http://localhost:3001/api/invoice";
 
 ---
 
-## 7. Integración con Automation Anywhere
+## 7. Demo rápida
+
+### 🚀 ¿Quieres probarlo ahora mismo?
+
+No necesitas tener configurado Automation Anywhere para ver cómo funciona el sistema. He incluido un script de simulación que emula el comportamiento de un bot real (no procesa facturas porque se necesita del bot, solo emula el estado):
+
+1- Levanta el backend (cd api && npm run dev) y el frontend (cd client && npm run dev).
+
+2- Abre una nueva terminal en la raíz del proyecto.
+
+3- Ejecuta el simulador:
+
+```bash
+node src/scripts/bot-simulator.js
+```
+4- Sube cualquier PDF desde la web: verás cómo el sistema registra el archivo como PENDIENTE y el simulador lo marca automáticamente como PROCESADO en segundos.
+
+---
+
+## 8. Integración con Automation Anywhere
 
 El procesamiento documental es ejecutado por un **bot de Automation Anywhere** desplegado en un entorno control room. A continuación se describe el ciclo de vida técnico completo.
 
-### 7.1. Disparador del proceso
+### 8.1. Disparador del proceso
 
 El flujo se inicia cuando el usuario presiona **“Enviar a Automation Anywhere”** en el frontend. Esa acción ejecuta:
 
@@ -196,14 +213,14 @@ Content-Type: multipart/form-data
 
 El backend almacena el PDF en disco, genera un UUID vinculante (`invoice_id`) y persiste el registro con estado `PENDIENTE`.
 
-### 7.2. Obtención del trabajo pendiente
+### 8.2. Obtención del trabajo pendiente
 
 El bot puede conocer qué documentos debe procesar de dos formas:
 
 - **Pull model:** consulta periódicamente `GET /api/invoice/` y filtra por `invoice_status = 'PENDIENTE'`.
 - **Direct DB access:** lee directamente la tabla `Invoices` por el mismo estado, si el runner tiene acceso a PostgreSQL.
 
-### 7.3. Lectura del documento
+### 8.3. Lectura del documento
 
 Para cada registro seleccionado, el bot localiza el archivo físico usando `invoice_id` como nombre de archivo:
 
@@ -213,7 +230,7 @@ Para cada registro seleccionado, el bot localiza el archivo físico usando `invo
 
 Este contrato garantiza la trazabilidad entre el registro relacional y el objeto binario en disco, independientemente del nombre original del comprobante.
 
-### 7.4. Extracción de datos mediante el modelo entrenado
+### 8.4. Extracción de datos mediante el modelo entrenado
 
 El bot ejecuta un proceso de Automation Anywhere previamente entrenado, por ejemplo:
 
@@ -223,7 +240,7 @@ El bot ejecuta un proceso de Automation Anywhere previamente entrenado, por ejem
 
 El modelo interpreta el contenido del PDF y extrae los campos estructurados —número de factura, fecha de emisión, CUIT emisor/receptor, importes, ítems, etc.— normalizando tipos de dato y aplicando reglas de validación definidas durante el entrenamiento.
 
-### 7.5. Generación del archivo Excel
+### 8.5. Generación del archivo Excel
 
 Una vez extraídos los datos, el bot genera un archivo **Excel (.xlsx)** en la máquina del usuario o del runner. El mapeo respeta el esquema tabular definido en el modelo entrenado, permitiendo columnas como:
 
@@ -234,8 +251,8 @@ Una vez extraídos los datos, el bot genera un archivo **Excel (.xlsx)** en la m
 | `receiver_address`       | string | Dirección del receptor de la factura        |
 | `total_amount`           | number | Total de la factura                         |
 | `bank_account_number`    | number | numero de cuenta bancaria                   |
-| `bank_name`              | number | nombre del banco                            |
-| `vendor_address`         | number | Dirección del vendedor                      |
+| `bank_name`              | string | nombre del banco                            |
+| `vendor_address`         | string | Dirección del vendedor                      |
 | `email`                  | string | Email del receptor                          |
 | `description`            | string | Descripción del producto comprado           |
 | `quantity`               | number | Cantidad de prodcuto                        |
@@ -244,7 +261,7 @@ Una vez extraídos los datos, el bot genera un archivo **Excel (.xlsx)** en la m
 
 > El archivo Excel se almacena localmente en la estación de trabajo del runner. La aplicación web no recibe ni persiste el contenido del Excel por diseño, salvo que se extienda la integración para retornar una URL o base64 del archivo.
 
-### 7.6. Actualización del estado del procesamiento
+### 8.6. Actualización del estado del procesamiento
 
 Al finalizar la extracción y la generación del Excel, el bot notifica el resultado al backend:
 
@@ -265,7 +282,7 @@ Content-Type: application/json
 
 ```json
 {
-  "status": "REQUIERE VALIDACIÓN",
+  "status": "REQUIERE VALIDACIÓN"
 }
 ```
 
@@ -280,11 +297,11 @@ Content-Type: application/json
 
 El backend actualiza `invoice_status` y, en caso de corresponder, `invoice_error_log`. El frontend detecta el cambio mediante el intervalo de polling configurado sobre `GET /api/invoice/`.
 
-### 7.7. Estado final esperado
+### 8.7. Estado final esperado
 
 Al concluir el ciclo, el usuario visualiza en el dashboard el estado actualizado (`PROCESANDO`, `PROCESADO`, `ERROR`, `REQUIERE VALIDACIÓN`, etc.) junto con el log de error si el bot reportó alguna falla, sin necesidad de recargar manualmente la página.
 
-### 7.8. Requisitos y configuración del entorno de RPA
+### 8.8. Requisitos y configuración del entorno de RPA
 
 Para el funcionamiento del procesamiento automatizado, el desarrollador debe asegurar la siguiente infraestructura:
 
@@ -304,7 +321,7 @@ Para el funcionamiento del procesamiento automatizado, el desarrollador debe ase
   - la validación de reglas de negocio,
   - el callback al backend mediante `PUT /api/invoice/status/:id`.
 
-### 7.9. Flujo de activación (Trigger-Based)
+### 8.9. Flujo de activación (Trigger-Based)
 
 El bot opera bajo un modelo de **Event Trigger**, ejecutándose automáticamente según el siguiente paso a paso:
 
@@ -325,7 +342,7 @@ El bot opera bajo un modelo de **Event Trigger**, ejecutándose automáticamente
 
 ---
 
-## 8. Componentes principales del frontend
+## 9. Componentes principales del frontend
 
 | Componente            | Responsabilidad                                                                 |
 |-----------------------|---------------------------------------------------------------------------------|
@@ -338,30 +355,31 @@ El bot opera bajo un modelo de **Event Trigger**, ejecutándose automáticamente
 
 ---
 
-## 9. Observaciones y notas de funcionamiento
+## 10. Observaciones y notas de funcionamiento
 
 - El backend genera el UUID del registro antes de guardar el archivo, garantizando que el nombre en disco coincida con `invoice_id`.
 - El límite de tamaño de archivo está configurado en Multer (revisar `api/src/config/multer.js`).
-- El filtro de archivos acepta `PDF`, `XML`, `CSV` y `TXT` desde el backend, pero el frontend actualmente solo permite `PDF`.
+- El filtro de archivos acepta `PDF` desde el backend, pero el frontend actualmente solo permite `PDF`.
 - El frontend realiza polling automático cada 5 segundos sobre `GET /api/invoice/` para reflejar los cambios de estado reportados por el bot.
 - El endpoint de actualización de estado es unificado: sirve tanto para estados exitosos como para errores.
 - El bot de Automation Anywhere es el responsable de aplicar el modelo entrenado y de generar el Excel en la máquina local; esta aplicación solo expone el documento y registra el estado.
 
 ---
 
-## 10. Scripts útiles
+## 11. Scripts útiles
 
 | Comando           | Ubicación   | Descripción                          |
 |-------------------|-------------|--------------------------------------|
 | `npm start`       | `api/`      | Levanta el servidor en producción    |
 | `npm run dev`     | `api/`      | Levanta el servidor con nodemon      |
+| `node src/scripts/bot-simulator.js` | `api`/ | Levanta el simulador    |
 | `npm run dev`     | `client/`   | Levanta el cliente Vite              |
 | `npm run build`   | `client/`   | Genera el build de producción        |
 | `npm run preview` | `client/`   | Previsualiza el build de producción  |
 
 ---
 
-## 11. Autor
+## 12. Autor
 
 - **Facundo Maksud**
 - Linkedin: [https://www.linkedin.com/in/facundo-maksud/](https://www.linkedin.com/in/facundo-maksud/)
