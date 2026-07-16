@@ -46,9 +46,9 @@ invoice-rpa-manager/
 
 ```text
 [Frontend] --> [API Node.js] --> [PostgreSQL]
-                    |
-                    | (Files)
-                    v
+                  ↑  |
+        (Resp AA) |  |(Files)
+                  |  v
              [Automation Anywhere]
 ```
 ---
@@ -92,7 +92,7 @@ invoice-rpa-manager/
 7. El bot ejecuta el proceso/documento entrenado en **Automation Anywhere** y extrae los campos estructurados del comprobante (número, fecha, importe, CUIT, etc.).
 8. El bot genera un archivo **Excel (.xlsx)** en la máquina del usuario con los datos extraídos, organizados en columnas y hojas según el esquema configurado en el modelo entrenado.
 9. Una vez finalizada la extracción y generación del Excel, el bot envía una petición `PUT` a `/api/invoice/status/:id` con:
-   - `status` (`PROCESANDO`, `PROCESADO`, `ERROR`, etc.)
+   - `status` (`REQUIERE VALDIACIÓN`, `PROCESADO`, `ERROR`)
    - `error_log` (opcional, requerido solo si el estado es `ERROR`)
 10. El frontend monitorea el estado consultando `GET /api/invoice/`.
 
@@ -143,16 +143,14 @@ invoice-rpa-manager/
 Crear un archivo `.env` dentro de `api/` a partir de `.env.template`:
 
 ```env
-PORT=3001
+PORT=tu_puerto_de_servidor
 DB_USER=tu_usuario
 DB_PASSWORD=tu_password
 DB_HOST=localhost
-DB_NAME=invoice_rpa
+DB_NAME=nombre_de_tu_db
 DB_PORT=5432
-UPLOAD_DIR=./uploads
+UPLOAD_DIR=ruta_donde_se_subira_el_archivo_para_activar_el_bot (Debe coincidir con la de Automation Anywhere)
 ```
-
-En producción también se puede usar `DATABASE_URL`.
 
 ### Instalación y ejecución
 
@@ -165,13 +163,12 @@ cd invoice-rpa-manager
 cd api
 npm install
 # Crear .env con tus credenciales
-npm start            # modo producción
-# npm run dev        # modo desarrollo con nodemon
+npm run dev  # modo desarrollo con nodemon
 
 # 3. Instalar y levantar el frontend
 cd ../client
 npm install
-npm run dev          # inicia en http://localhost:5173
+npm run dev # inicia en http://localhost:5173
 ```
 
 El frontend está configurado para consumir la API en:
@@ -186,7 +183,7 @@ const API_URL = "http://localhost:3001/api/invoice";
 
 ## 7. Integración con Automation Anywhere
 
-El procesamiento documental es ejecutado por un **bot de Automation Anywhere** desplegado en el Bot Runner o en un entorno control room. A continuación se describe el ciclo de vida técnico completo.
+El procesamiento documental es ejecutado por un **bot de Automation Anywhere** desplegado en un entorno control room. A continuación se describe el ciclo de vida técnico completo.
 
 ### 7.1. Disparador del proceso
 
@@ -222,7 +219,7 @@ El bot ejecuta un proceso de Automation Anywhere previamente entrenado, por ejem
 
 - **Document Automation** (models entrenados para reconocimiento de layouts de facturas)
 - **Automation Anywhere IQ Bot** con grupos de aprendizaje para comprobantes locales
-- Custom packages que encapsulan lógica de extracción basada en OCR, expresiones regulares o coordenadas
+
 
 El modelo interpreta el contenido del PDF y extrae los campos estructurados —número de factura, fecha de emisión, CUIT emisor/receptor, importes, ítems, etc.— normalizando tipos de dato y aplicando reglas de validación definidas durante el entrenamiento.
 
@@ -232,14 +229,18 @@ Una vez extraídos los datos, el bot genera un archivo **Excel (.xlsx)** en la m
 
 | Columna                  | Tipo   | Origen                                      |
 |--------------------------|--------|---------------------------------------------|
-| `numero_factura`         | string | Campo detectado en el encabezado            |
-| `fecha_emision`          | date   | Fecha parseada del comprobante              |
-| `cuit_emisor`            | string | Campo validado de la sucursal emisora       |
-| `cuit_receptor`          | string | Campo validado del receptor                 |
-| `importe_neto`           | number | Campo numérico normalizado                  |
-| `importe_iva`            | number | Campo numérico normalizado                  |
-| `importe_total`          | number | Campo numérico normalizado                  |
-| `fecha_procesamiento`    | date   | Timestamp de ejecución del bot              |
+| `invoice_number`         | string | Número de factura                           |
+| `invoice_date`           | date   | Fecha parseada del comprobante              |
+| `receiver_address`       | string | Dirección del receptor de la factura        |
+| `total_amount`           | number | Total de la factura                         |
+| `bank_account_number`    | number | numero de cuenta bancaria                   |
+| `bank_name`              | number | nombre del banco                            |
+| `vendor_address`         | number | Dirección del vendedor                      |
+| `email`                  | string | Email del receptor                          |
+| `description`            | string | Descripción del producto comprado           |
+| `quantity`               | number | Cantidad de prodcuto                        |
+| `unit_price`             | number | Precio unitario                             |
+| `total_price`            | number | Precio total                                |        
 
 > El archivo Excel se almacena localmente en la estación de trabajo del runner. La aplicación web no recibe ni persiste el contenido del Excel por diseño, salvo que se extienda la integración para retornar una URL o base64 del archivo.
 
@@ -265,7 +266,6 @@ Content-Type: application/json
 ```json
 {
   "status": "REQUIERE VALIDACIÓN",
-  "error_log": "Confianza insuficiente en el campo importe_total."
 }
 ```
 
@@ -364,4 +364,4 @@ El bot opera bajo un modelo de **Event Trigger**, ejecutándose automáticamente
 ## 11. Autor
 
 - **Facundo Maksud**
-- Repositorio: [https://github.com/maksudxx/invoice-rpa-manager.git](https://github.com/maksudxx/invoice-rpa-manager.git)
+- Linkedin: [https://www.linkedin.com/in/facundo-maksud/](https://www.linkedin.com/in/facundo-maksud/)
